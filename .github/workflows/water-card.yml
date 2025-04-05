@@ -24,19 +24,38 @@ jobs:
         with:
           python-version: "3.10"
           
+      - name: 安装依赖
+        run: pip install pycryptodome  # 添加可能需要的依赖
+          
       - name: 计算数据块
         id: calculation
         run: |
+          # 调试：显示当前目录内容
+          ls -la
+          
+          # 确保脚本可执行
+          chmod +x exploit.py
+          
           # 处理参数传递
           if [ -z "${{ github.event.inputs.usage_count }}" ]; then
+            echo "执行命令: python exploit.py ${{ github.event.inputs.balance }}"
             OUTPUT=$(python exploit.py "${{ github.event.inputs.balance }}")
           else
+            echo "执行命令: python exploit.py ${{ github.event.inputs.balance }} ${{ github.event.inputs.usage_count }}"
             OUTPUT=$(python exploit.py "${{ github.event.inputs.balance }}" "${{ github.event.inputs.usage_count }}")
           fi
+          
+          # 检查命令是否成功执行
+          if [ $? -ne 0 ]; then
+            echo "错误：脚本执行失败"
+            exit 1
+          fi
+          
+          echo "生成结果: ${OUTPUT}"
           echo "RESULT=${OUTPUT}" >> $GITHUB_OUTPUT
-          echo "生成的数据块：${OUTPUT}"
           
       - name: 生成报告
+        if: success()
         run: |
           cat << EOF > report.txt
           ╔══════════════════════════╗
@@ -52,6 +71,7 @@ jobs:
           EOF
           
       - name: 上传结果
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: 水卡数据结果

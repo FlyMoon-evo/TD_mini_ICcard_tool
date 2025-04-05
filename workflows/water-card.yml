@@ -1,0 +1,58 @@
+name: 水卡数据块生成器
+
+on:
+  workflow_dispatch:  # 手动触发工作流
+    inputs:
+      余额:
+        description: '金额 (0-655.35元)'
+        required: true
+        type: string
+      使用次数:
+        description: '可选 (0-255次，留空则随机生成)'
+        required: false
+        type: string
+
+jobs:
+  计算数据块:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        
+      - name: 配置Python环境
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'  # 指定Python版本
+          
+      - name: 执行计算
+        id: calculation
+        run: |
+          # 处理参数：如果未提供使用次数则留空
+          if [ -z "${{ github.event.inputs.使用次数 }}" ]; then
+            python exploit.py ${{ github.event.inputs.余额 }}
+          else
+            python exploit.py ${{ github.event.inputs.余额 }} ${{ github.event.inputs.使用次数 }}
+          fi
+          # 捕获输出结果
+          echo "RESULT=$(python exploit.py ${{ github.event.inputs.余额 }} ${{ github.event.inputs.使用次数 || '' }})" >> $GITHUB_OUTPUT
+          
+      - name: 生成结果报告
+        run: |
+          echo "╔══════════════════════════╗"
+          echo "║      水卡数据生成结果      ║"
+          echo "╠═══════════════╦══════════╣"
+          echo "║ 设置余额      ║ ${{ github.event.inputs.余额 }}元 ║"
+          echo "╠═══════════════╬══════════╣"
+          echo "║ 使用次数      ║ ${{ github.event.inputs.使用次数 || '随机' }}次 ║"
+          echo "╠═══════════════╩══════════╣"
+          echo "║ 生成的数据块：            ║"
+          echo "║ ${{ steps.calculation.outputs.RESULT }} ║"
+          echo "╚══════════════════════════╝" > report.txt
+          
+      - name: 上传结果
+        uses: actions/upload-artifact@v3
+        with:
+          name: 水卡数据块
+          path: |
+            report.txt
+            result.txt

@@ -24,39 +24,50 @@ jobs:
         with:
           python-version: "3.10"
           
-      - name: 安装依赖
-        run: pip install pycryptodome  # 添加可能需要的依赖
+      - name: 调试信息
+        run: |
+          echo "当前工作目录: $(pwd)"
+          ls -la
+          echo "Python版本: $(python --version)"
+          echo "Pip版本: $(pip --version)"
           
       - name: 计算数据块
         id: calculation
         run: |
-          # 调试：显示当前目录内容
-          ls -la
-          
-          # 确保脚本可执行
-          chmod +x exploit.py
-          
-          # 处理参数传递
-          if [ -z "${{ github.event.inputs.usage_count }}" ]; then
-            echo "执行命令: python exploit.py ${{ github.event.inputs.balance }}"
-            OUTPUT=$(python exploit.py "${{ github.event.inputs.balance }}")
-          else
-            echo "执行命令: python exploit.py ${{ github.event.inputs.balance }} ${{ github.event.inputs.usage_count }}"
-            OUTPUT=$(python exploit.py "${{ github.event.inputs.balance }}" "${{ github.event.inputs.usage_count }}")
-          fi
-          
-          # 检查命令是否成功执行
-          if [ $? -ne 0 ]; then
-            echo "错误：脚本执行失败"
+          # 确保脚本存在
+          if [ ! -f "exploit.py" ]; then
+            echo "错误: exploit.py 文件不存在!"
             exit 1
           fi
           
-          echo "生成结果: ${OUTPUT}"
-          echo "RESULT=${OUTPUT}" >> $GITHUB_OUTPUT
+          # 添加执行权限
+          chmod +x exploit.py
+          
+          # 构建命令参数
+          CMD="python exploit.py ${{ github.event.inputs.balance }}"
+          if [ -n "${{ github.event.inputs.usage_count }}" ]; then
+            CMD="$CMD ${{ github.event.inputs.usage_count }}"
+          fi
+          
+          echo "执行命令: $CMD"
+          
+          # 执行并捕获输出
+          OUTPUT=$($CMD 2>&1)
+          EXIT_CODE=$?
+          
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "脚本执行失败，错误代码: $EXIT_CODE"
+            echo "错误输出: $OUTPUT"
+            exit 1
+          fi
+          
+          echo "脚本输出: $OUTPUT"
+          echo "RESULT=$OUTPUT" >> $GITHUB_OUTPUT
           
       - name: 生成报告
         if: success()
         run: |
+          echo "正在生成报告..."
           cat << EOF > report.txt
           ╔══════════════════════════╗
           ║      水卡数据生成结果      ║
@@ -69,6 +80,7 @@ jobs:
           ║ ${{ steps.calculation.outputs.RESULT }} ║
           ╚══════════════════════════╝
           EOF
+          echo "报告生成完成"
           
       - name: 上传结果
         if: success()

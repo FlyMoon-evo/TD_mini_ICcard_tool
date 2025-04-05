@@ -27,22 +27,24 @@ jobs:
       - name: 计算数据块
         id: calculation
         run: |
-          if [ -z "${{ inputs.usage_count }}" ]; then
-            python exploit.py "${{ inputs.balance }}"
+          # 处理参数传递
+          if [ -z "${{ github.event.inputs.usage_count }}" ]; then
+            OUTPUT=$(python exploit.py "${{ github.event.inputs.balance }}")
           else
-            python exploit.py "${{ inputs.balance }}" "${{ inputs.usage_count }}"
+            OUTPUT=$(python exploit.py "${{ github.event.inputs.balance }}" "${{ github.event.inputs.usage_count }}")
           fi
-          echo "RESULT=$(python exploit.py "${{ inputs.balance }}" ${{ inputs.usage_count || '' }})" >> $GITHUB_OUTPUT
+          echo "RESULT=${OUTPUT}" >> $GITHUB_OUTPUT
+          echo "生成的数据块：${OUTPUT}"
           
       - name: 生成报告
         run: |
-          cat << 'EOF' > report.txt
+          cat << EOF > report.txt
           ╔══════════════════════════╗
           ║      水卡数据生成结果      ║
           ╠═══════════════╦══════════╣
-          ║ 设置金额      ║ ${{ inputs.balance }}元 ║
+          ║ 设置金额      ║ ${{ github.event.inputs.balance }}元 ║
           ╠═══════════════╬══════════╣
-          ║ 使用次数      ║ ${{ inputs.usage_count || '随机' }}次 ║
+          ║ 使用次数      ║ ${{ github.event.inputs.usage_count || '随机' }}次 ║
           ╠═══════════════╩══════════╣
           ║ 生成的数据块：            ║
           ║ ${{ steps.calculation.outputs.RESULT }} ║

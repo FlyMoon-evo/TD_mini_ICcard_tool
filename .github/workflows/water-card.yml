@@ -24,51 +24,59 @@ jobs:
         with:
           python-version: "3.10"
           
-      - name: 调试信息
+      - name: 显示调试信息
         run: |
-          echo "当前工作目录: $(pwd)"
+          echo "=== 系统信息 ==="
+          echo "工作目录: $(pwd)"
+          echo "目录内容:"
           ls -la
+          echo "Python路径: $(which python)"
           echo "Python版本: $(python --version)"
           echo "Pip版本: $(pip --version)"
           
-      - name: 计算数据块
-        id: calculation
+      - name: 验证脚本
         run: |
-          # 确保脚本存在
           if [ ! -f "exploit.py" ]; then
-            echo "错误: exploit.py 文件不存在!"
+            echo "❌ 错误: exploit.py 文件不存在!"
             exit 1
           fi
+          echo "✅ 找到 exploit.py 文件"
+          echo "文件权限:"
+          ls -la exploit.py
           
-          # 添加执行权限
-          chmod +x exploit.py
+      - name: 执行计算
+        id: calculate
+        run: |
+          set -e  # 遇到错误立即退出
           
-          # 构建命令参数
-          CMD="python exploit.py ${{ github.event.inputs.balance }}"
+          # 准备参数
+          ARGS=("${{ github.event.inputs.balance }}")
           if [ -n "${{ github.event.inputs.usage_count }}" ]; then
-            CMD="$CMD ${{ github.event.inputs.usage_count }}"
+            ARGS+=("${{ github.event.inputs.usage_count }}")
           fi
           
-          echo "执行命令: $CMD"
+          echo "执行命令: python exploit.py ${ARGS[@]}"
           
           # 执行并捕获输出
-          OUTPUT=$($CMD 2>&1)
+          OUTPUT=$(python exploit.py "${ARGS[@]}" 2>&1)
           EXIT_CODE=$?
           
           if [ $EXIT_CODE -ne 0 ]; then
-            echo "脚本执行失败，错误代码: $EXIT_CODE"
-            echo "错误输出: $OUTPUT"
+            echo "❌ 脚本执行失败 (退出码: $EXIT_CODE)"
+            echo "错误输出:"
+            echo "$OUTPUT"
             exit 1
           fi
           
-          echo "脚本输出: $OUTPUT"
+          echo "✅ 脚本执行成功"
+          echo "输出结果: $OUTPUT"
           echo "RESULT=$OUTPUT" >> $GITHUB_OUTPUT
           
       - name: 生成报告
         if: success()
         run: |
           echo "正在生成报告..."
-          cat << EOF > report.txt
+          cat << 'EOF' > report.txt
           ╔══════════════════════════╗
           ║      水卡数据生成结果      ║
           ╠═══════════════╦══════════╣
@@ -77,10 +85,10 @@ jobs:
           ║ 使用次数      ║ ${{ github.event.inputs.usage_count || '随机' }}次 ║
           ╠═══════════════╩══════════╣
           ║ 生成的数据块：            ║
-          ║ ${{ steps.calculation.outputs.RESULT }} ║
+          ║ ${{ steps.calculate.outputs.RESULT }} ║
           ╚══════════════════════════╝
           EOF
-          echo "报告生成完成"
+          echo "报告已保存到 report.txt"
           
       - name: 上传结果
         if: success()

@@ -1,4 +1,4 @@
-name: 水卡数据生成器
+name: 水卡数据生成器 - 调试版
 
 on:
   workflow_dispatch:
@@ -13,86 +13,122 @@ on:
         type: string
 
 jobs:
-  generate:
+  debug:
     runs-on: ubuntu-latest
     steps:
+      # 第一阶段：环境准备
       - name: 检出代码
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 获取完整历史记录
         
       - name: 设置Python环境
         uses: actions/setup-python@v4
         with:
           python-version: "3.10"
           
-      - name: 显示调试信息
+      # 第二阶段：系统诊断
+      - name: 系统诊断
         run: |
-          echo "=== 系统信息 ==="
+          echo "=== 系统诊断报告 ==="
+          echo "当前时间: $(date)"
           echo "工作目录: $(pwd)"
-          echo "目录内容:"
-          ls -la
-          echo "Python路径: $(which python)"
-          echo "Python版本: $(python --version)"
-          echo "Pip版本: $(pip --version)"
+          echo "用户: $(whoami)"
+          echo "Python路径: $(which python3)"
+          echo "Python版本: $(python3 --version)"
+          echo "Pip版本: $(pip3 --version)"
+          echo "环境变量:"
+          printenv | sort
+          echo "目录结构:"
+          ls -laR
+          echo "脚本内容:"
+          cat exploit.py || echo "无exploit.py文件"
+          echo "=== 诊断结束 ==="
           
-      - name: 验证脚本
+      # 第三阶段：模拟测试
+      - name: 模拟测试
+        id: simulation
         run: |
+          echo "=== 开始模拟测试 ==="
+          
+          # 创建测试脚本
+          cat > test_script.py << 'EOT'
+          import sys
+          print("模拟脚本启动")
+          print(f"接收参数: {sys.argv}")
+          if len(sys.argv) < 2:
+              print("错误: 需要至少1个参数", file=sys.stderr)
+              sys.exit(1)
+          print("模拟计算完成")
+          print("结果: A1B2C3D4E5F6")
+          EOT
+          
+          # 执行测试
+          echo "执行测试脚本..."
+          python3 test_script.py "100.00" "10"
+          
+          echo "=== 测试结束 ==="
+          
+      # 第四阶段：实际执行（仅在测试通过后运行）
+      - name: 执行真实脚本
+        if: success()
+        id: execution
+        run: |
+          echo "=== 开始执行真实脚本 ==="
+          
+          # 验证脚本存在
           if [ ! -f "exploit.py" ]; then
-            echo "❌ 错误: exploit.py 文件不存在!"
+            echo "错误: exploit.py 文件不存在!" >&2
             exit 1
           fi
-          echo "✅ 找到 exploit.py 文件"
-          echo "文件权限:"
-          ls -la exploit.py
-          
-      - name: 执行计算
-        id: calculate
-        run: |
-          set -e  # 遇到错误立即退出
           
           # 准备参数
           ARGS=("${{ github.event.inputs.balance }}")
-          if [ -n "${{ github.event.inputs.usage_count }}" ]; then
-            ARGS+=("${{ github.event.inputs.usage_count }}")
-          fi
+          [ -n "${{ github.event.inputs.usage_count }}" ] && ARGS+=("${{ github.event.inputs.usage_count }}")
           
-          echo "执行命令: python exploit.py ${ARGS[@]}"
-          
-          # 执行并捕获输出
-          OUTPUT=$(python exploit.py "${ARGS[@]}" 2>&1)
-          EXIT_CODE=$?
-          
-          if [ $EXIT_CODE -ne 0 ]; then
-            echo "❌ 脚本执行失败 (退出码: $EXIT_CODE)"
-            echo "错误输出:"
+          # 执行并记录完整输出
+          {
+            echo "执行命令: python exploit.py ${ARGS[@]}"
+            set -x  # 开启命令回显
+            OUTPUT=$(python exploit.py "${ARGS[@]}" 2>&1)
+            STATUS=$?
+            set +x
+            echo "退出状态码: $STATUS"
+            echo "脚本输出:"
             echo "$OUTPUT"
-            exit 1
-          fi
+            
+            if [ $STATUS -ne 0 ]; then
+              echo "执行失败" >&2
+              exit $STATUS
+            fi
+            
+            echo "result=$OUTPUT" >> $GITHUB_OUTPUT
+          } | tee execution.log
           
-          echo "✅ 脚本执行成功"
-          echo "输出结果: $OUTPUT"
-          echo "RESULT=$OUTPUT" >> $GITHUB_OUTPUT
+          echo "=== 执行结束 ==="
           
+      # 第五阶段：结果处理
       - name: 生成报告
         if: success()
         run: |
-          echo "正在生成报告..."
-          cat << 'EOF' > report.txt
-          ╔══════════════════════════╗
-          ║      水卡数据生成结果      ║
-          ╠═══════════════╦══════════╣
-          ║ 设置金额      ║ ${{ github.event.inputs.balance }}元 ║
-          ╠═══════════════╬══════════╣
-          ║ 使用次数      ║ ${{ github.event.inputs.usage_count || '随机' }}次 ║
-          ╠═══════════════╩══════════╣
-          ║ 生成的数据块：            ║
-          ║ ${{ steps.calculate.outputs.RESULT }} ║
-          ╚══════════════════════════╝
-          EOF
-          echo "报告已保存到 report.txt"
+          echo "生成最终报告..."
+          cat << EOF > report.txt
+          === 执行摘要 ===
+          时间: $(date)
+          金额: ${{ github.event.inputs.balance }}
+          次数: ${{ github.event.inputs.usage_count || '随机' }}
+          结果: ${{ steps.execution.outputs.result || '无' }}
           
-      - name: 上传结果
-        if: success()
+          === 系统信息 ===
+          $(python3 --version)
+          $(pip3 --version)
+          EOF
+          
+      # 最终上传所有日志
+      - name: 上传诊断数据
         uses: actions/upload-artifact@v4
         with:
-          name: 水卡数据结果
-          path: report.txt
+          name: diagnostic-data
+          path: |
+            execution.log
+            report.txt

@@ -3,7 +3,7 @@ name: 水卡数据块生成器
 on:
   workflow_dispatch:  # 手动触发工作流
     inputs:
-      余额:
+      余额:655.35
         description: '金额 (0-655.35元)'
         required: true
         type: string

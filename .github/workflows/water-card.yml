@@ -1,13 +1,14 @@
-name: 水卡数据生成器
+name: Water Card Data Generator
+
 on:
   workflow_dispatch:
     inputs:
-      balance:655.35
-        description: '金额 (0-655.35元)'
+      balance:
+        description: "金额 (0-655.35元)"
         required: true
         type: string
       usage_count:
-        description: '使用次数 (0-255次，留空则随机)'
+        description: "使用次数 (0-255次，留空则随机)"
         required: false
         type: string
 
@@ -15,40 +16,41 @@ jobs:
   generate:
     runs-on: ubuntu-latest
     steps:
-      - name: 检出代码
+      - name: Checkout code
         uses: actions/checkout@v4
         
-      - name: 设置Python环境
+      - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
+          python-version: "3.10"
           
-      - name: 计算数据块
-        id: calculation
+      - name: Calculate data block
+        id: calc
         run: |
-          if [ -z "${{ github.event.inputs.usage_count }}" ]; then
-            python exploit.py "${{ github.event.inputs.balance }}"
+          if [ -z "${{ inputs.usage_count }}" ]; then
+            python exploit.py "${{ inputs.balance }}"
           else
-            python exploit.py "${{ github.event.inputs.balance }}" "${{ github.event.inputs.usage_count }}"
+            python exploit.py "${{ inputs.balance }}" "${{ inputs.usage_count }}"
           fi
-          echo "RESULT=$(python exploit.py "${{ github.event.inputs.balance }}" ${{ github.event.inputs.usage_count || '' }})" >> $GITHUB_OUTPUT
+          echo "RESULT=$(python exploit.py "${{ inputs.balance }}" ${{ inputs.usage_count || '' }})" >> $GITHUB_OUTPUT
           
-      - name: 生成报告
+      - name: Generate report
         run: |
-          printf '%s\n' \
-          "╔══════════════════════════╗" \
-          "║      水卡数据生成结果      ║" \
-          "╠═══════════════╦══════════╣" \
-          "║ 设置金额      ║ ${{ github.event.inputs.balance }}元 ║" \
-          "╠═══════════════╬══════════╣" \
-          "║ 使用次数      ║ ${{ github.event.inputs.usage_count || '随机' }}次 ║" \
-          "╠═══════════════╩══════════╣" \
-          "║ 生成的数据块：            ║" \
-          "║ ${{ steps.calculation.outputs.RESULT }} ║" \
-          "╚══════════════════════════╝" > report.txt
+          cat << 'EOF' > report.txt
+          ╔══════════════════════════╗
+          ║     Water Card Result    ║
+          ╠═══════════════╦══════════╣
+          ║ Balance       ║ ${{ inputs.balance }} ¥ ║
+          ╠═══════════════╬══════════╣
+          ║ Usage Count   ║ ${{ inputs.usage_count || 'Random' }} ║
+          ╠═══════════════╩══════════╣
+          ║ Data Block:             ║
+          ║ ${{ steps.calc.outputs.RESULT }} ║
+          ╚══════════════════════════╝
+          EOF
           
-      - name: 上传结果
+      - name: Upload result
         uses: actions/upload-artifact@v3
         with:
-          name: 水卡数据结果
+          name: water-card-data
           path: report.txt

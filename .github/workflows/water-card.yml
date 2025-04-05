@@ -1,4 +1,4 @@
-name: Water Card Data Generator
+name: 水卡数据生成器
 
 on:
   workflow_dispatch:
@@ -16,16 +16,16 @@ jobs:
   generate:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: 检出代码
         uses: actions/checkout@v4
         
-      - name: Setup Python
+      - name: 设置Python环境
         uses: actions/setup-python@v4
         with:
           python-version: "3.10"
           
-      - name: Calculate data block
-        id: calc
+      - name: 计算数据块
+        id: calculation
         run: |
           if [ -z "${{ inputs.usage_count }}" ]; then
             python exploit.py "${{ inputs.balance }}"
@@ -34,23 +34,23 @@ jobs:
           fi
           echo "RESULT=$(python exploit.py "${{ inputs.balance }}" ${{ inputs.usage_count || '' }})" >> $GITHUB_OUTPUT
           
-      - name: Generate report
+      - name: 生成报告
         run: |
           cat << 'EOF' > report.txt
           ╔══════════════════════════╗
-          ║     Water Card Result    ║
+          ║      水卡数据生成结果      ║
           ╠═══════════════╦══════════╣
-          ║ Balance       ║ ${{ inputs.balance }} ¥ ║
+          ║ 设置金额      ║ ${{ inputs.balance }}元 ║
           ╠═══════════════╬══════════╣
-          ║ Usage Count   ║ ${{ inputs.usage_count || 'Random' }} ║
+          ║ 使用次数      ║ ${{ inputs.usage_count || '随机' }}次 ║
           ╠═══════════════╩══════════╣
-          ║ Data Block:             ║
-          ║ ${{ steps.calc.outputs.RESULT }} ║
+          ║ 生成的数据块：            ║
+          ║ ${{ steps.calculation.outputs.RESULT }} ║
           ╚══════════════════════════╝
           EOF
           
-      - name: Upload result
-        uses: actions/upload-artifact@v3
+      - name: 上传结果
+        uses: actions/upload-artifact@v3.1.2  # 明确指定完整版本号
         with:
-          name: water-card-data
+          name: 水卡数据结果
           path: report.txt

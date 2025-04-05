@@ -1,0 +1,87 @@
+name: 水卡数据生成器 - 最终修正版
+
+on:
+  workflow_dispatch:
+    inputs:
+      balance:
+        description: "金额 (0-655.35元)"
+        required: true
+        type: string
+      usage_count:
+        description: "使用次数 (0-255次)"
+        required: false
+        type: string
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        
+      - name: 设置Python环境
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+          
+      - name: 安装依赖
+        run: |
+          pip install pycryptodome
+          pip list
+          
+      - name: 准备执行环境
+        run: |
+          echo "当前目录: $(pwd)"
+          ls -la
+          chmod +x exploit.py
+          echo "脚本MD5: $(md5sum exploit.py)"
+          
+      - name: 执行计算
+        id: calc
+        run: |
+          set -xeuo pipefail
+          
+          # 参数验证
+          balance="${{ inputs.balance }}"
+          usage_count="${{ inputs.usage_count || '0' }}"
+          
+          # 转换为整数处理
+          balance_int=$(echo "$balance * 100" | bc | cut -d. -f1)
+          usage_int=$usage_count
+          
+          # 执行脚本
+          echo "执行参数:"
+          echo "金额: $balance (转换为: $balance_int)"
+          echo "次数: $usage_int"
+          
+          output=$(python exploit.py "$balance_int" "$usage_int" 2>&1)
+          status=$?
+          
+          if [ $status -ne 0 ]; then
+            echo "执行失败，错误信息:"
+            echo "$output"
+            echo "尝试调试模式..."
+            python -v exploit.py "$balance_int" "$usage_int"
+            exit $status
+          fi
+          
+          echo "result=$output" >> $GITHUB_OUTPUT
+          echo "执行成功，结果已保存"
+          
+      - name: 生成报告
+        if: success()
+        run: |
+          cat << EOF > report.txt
+          水卡数据生成结果
+          =================
+          时间: $(date)
+          金额: ${{ inputs.balance }}元
+          次数: ${{ inputs.usage_count || '随机' }}次
+          数据块: ${{ steps.calc.outputs.result }}
+          EOF
+          
+      - name: 上传结果
+        uses: actions/upload-artifact@v4
+        with:
+          name: water-card-result
+          path: report.txt
